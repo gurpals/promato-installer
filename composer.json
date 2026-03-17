@@ -1,0 +1,19 @@
+{
+    "name": "promato/installer",
+    "description": "Global installer for private packages",
+    "type": "project",
+    "require": {
+        "php": "^8.1",
+        "guzzlehttp/guzzle": "^7.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Installer\\": "src/"
+        }
+    },
+    "bin": [
+        "bin/install"
+    ],
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
