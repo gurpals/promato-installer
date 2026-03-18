@@ -1,7 +1,13 @@
 {
     "name": "promato/installer",
-    "description": "Global installer for private packages",
+    "description": "All new packages will be installed using this installer",
     "type": "project",
+    "license": "proprietary",
+    "authors": [
+        {
+            "name": "WIS"
+        }
+    ],
     "require": {
         "php": "^8.1",
         "guzzlehttp/guzzle": "^7.0"
