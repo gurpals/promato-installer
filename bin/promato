@@ -1,8 +1,17 @@
 #!/usr/bin/env php
 <?php
 
-require __DIR__ . '/../../autoload.php';
+$paths = [
+    __DIR__ . '/../../../autoload.php', // global install
+    __DIR__ . '/../vendor/autoload.php', // local dev
+];
 
+foreach ($paths as $path) {
+    if (file_exists($path)) {
+        require $path;
+        break;
+    }
+}
 use Installer\InstallCommand;
 
 $token = $argv[1] ?? null;
