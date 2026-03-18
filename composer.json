@@ -1,5 +1,5 @@
 {
-    "name": "promato/installer",
+    "name": "gurpals/promato-installer",
     "description": "All new packages will be installed using this installer",
     "type": "project",
     "license": "proprietary",
