@@ -44,11 +44,11 @@ class InstallCommand
         }
 
         $repo = $data['repo'];
-        $version = $data['version'];
+        // $version = $data['version'];
         $folder = "Modules/" . basename($package);
 
         echo "📦 Installing package...\n";
-        system("git clone --branch $version --single-branch $repo $folder");
+        system("git clone --branch $package --single-branch $repo $folder");
         // // 🚀 Clone
         // system("git clone --depth=1 $repo $folder");
 
