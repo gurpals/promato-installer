@@ -45,18 +45,18 @@ class InstallCommand
 
         $repo = $data['repo'];
         $version = $data['version'];
-        $folder = "packages/" . basename($package);
+        $folder = "Modules/" . basename($package);
 
         echo "📦 Installing package...\n";
+        system("git clone --branch $version --single-branch $repo $folder");
+        // // 🚀 Clone
+        // system("git clone --depth=1 $repo $folder");
 
-        // 🚀 Clone
-        system("git clone --depth=1 $repo $folder");
+        // // 🔄 Fetch tags
+        // system("cd $folder && git fetch --tags");
 
-        // 🔄 Fetch tags
-        system("cd $folder && git fetch --tags");
-
-        // 🎯 Checkout version
-        system("cd $folder && git checkout $version");
+        // // 🎯 Checkout version
+        // system("cd $folder && git checkout $version");
 
         // 📦 Install dependencies
         system("cd $folder && composer install");
