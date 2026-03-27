@@ -16,7 +16,7 @@ class InstallCommand
         }
 
         // ✅ Prevent overwrite
-        if (is_dir("packages/" . basename($package))) {
+        if (is_dir("Modules/" . $package)) {
             echo "❌ Package already installed\n";
             exit(1);
         }
@@ -46,7 +46,7 @@ class InstallCommand
         $repo = $data['repo'];
         
         // $version = $data['version'];
-        $folder = "Modules/" . basename($package);
+        $folder = "Modules/" . $package;
 
         echo "📦 Installing package...\n";
         system("git clone --branch $package --single-branch $repo $folder");
