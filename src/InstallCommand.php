@@ -27,12 +27,20 @@ class InstallCommand
         $domain = gethostname();
 
         echo "🔍 Validating license...\n";
+         // 🔥 Generate RAW payload (NO HASH)
+        $payload = $this->generateFingerprint();
 
+        // 🔐 Create signature (IMPORTANT)
+        $signature = hash_hmac('sha256', json_encode($payload), $token);
+        $clientIp = $this->getClientIp();
         $res = $client->post($apiUrl, [
             'json' => [
-                'token' => $token,
-                'package' => $package,
-                'domain' => $domain
+                'token'     => $token,
+                'package'   => $package,
+                'domain'    => $domain,
+                'ip'        => $clientIp, // ✅ added
+                'payload'   => $payload,
+                'signature' => $signature,
             ]
         ]);
 
@@ -61,7 +69,124 @@ class InstallCommand
 
         // 📦 Install dependencies
         system("cd $folder && composer install");
+         echo "✅ Package installed successfully\n";
+        // Register module
+        system("php artisan module:enable $package");
+         echo "✅ Package Registered successfully\n";
+       
+        // Refresh autoload
+        system("composer dump-autoload");
 
-        echo "✅ Package installed successfully\n";
+        echo "⚙️ Running migrations...\n";
+        system("php artisan migrate --path=$folder/Database/migrations --force");
+
+        // Run seeders if available
+        $seederClass = "Modules\\$package\\Database\\Seeders\\DatabaseSeeder";
+
+        if (file_exists("$folder/database/seeders/DatabaseSeeder.php")) {
+            echo "🌱 Running seeders...\n";
+            system("php artisan db:seed --class=\"$seederClass\" --force");
+        }
+
+        echo "🎉 Setup completed successfully\n";
+    }
+    // 🔥 RAW fingerprint (NO HASH)
+    private function generateFingerprint()
+    {
+        $isDocker = $this->isDocker();
+
+        $data = [
+            'app_key'  => $this->getEnv('APP_KEY'),
+            'composer' => $this->getComposerName(),
+        ];
+
+        // Only include these if NOT docker
+        if (!$isDocker) {
+            $data['hostname'] = gethostname();
+            $data['mac'] = $this->getMacAddress();
+            $data['path'] = realpath(getcwd());
+        }
+
+        return $data;
+    }
+    private function getEnv($key)
+    {
+        $envPath = getcwd() . '/.env';
+
+        if (!file_exists($envPath)) {
+            return null;
+        }
+
+        $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+
+        foreach ($lines as $line) {
+            if (strpos($line, $key . '=') === 0) {
+                return trim(explode('=', $line, 2)[1]);
+            }
+        }
+
+        return null;
+    }
+
+    private function getComposerName()
+    {
+        $composerPath = getcwd() . '/composer.json';
+
+        if (!file_exists($composerPath)) {
+            return null;
+        }
+
+        $composer = json_decode(file_get_contents($composerPath), true);
+
+        return $composer['name'] ?? null;
+    }
+
+    // 🔐 Robust MAC address detection
+    private function getMacAddress()
+    {
+        if (!function_exists('shell_exec')) {
+            return 'mac_unavailable';
+        }
+
+        $mac = null;
+
+        // Windows
+        if (stripos(PHP_OS, 'WIN') === 0) {
+            $output = shell_exec('getmac');
+            preg_match('/([0-9A-F]{2}[-:]){5}[0-9A-F]{2}/i', $output, $matches);
+            $mac = $matches[0] ?? null;
+        } else {
+            // Linux / Unix
+            $output = shell_exec('ip link 2>/dev/null');
+
+            if ($output) {
+                preg_match_all('/link\/ether\s([0-9a-f:]{17})/i', $output, $matches);
+                $mac = $matches[1][0] ?? null;
+            }
+
+            if (!$mac) {
+                $mac = shell_exec('cat /sys/class/net/eth0/address 2>/dev/null');
+            }
+        }
+
+        $mac = trim($mac);
+        return $mac ? strtolower(str_replace('-', ':', $mac)) : '00:00:00:00:00:00';
+    }
+    private function isDocker()
+    {
+        return file_exists('/.dockerenv') ||
+            strpos(file_get_contents('/proc/1/cgroup') ?? '', 'docker') !== false;
+    }
+    private function getClientIp()
+    {
+        if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
+            return $_SERVER['HTTP_CLIENT_IP'];
+        }
+
+        if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+            return explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'])[0];
+        }
+
+        return $_SERVER['REMOTE_ADDR'] ?? 'unknown';
     }
 }
