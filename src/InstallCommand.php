@@ -14,7 +14,6 @@ class InstallCommand
             echo "❌ Git not installed\n";
             exit(1);
         }
-
         // ✅ Prevent overwrite
         if (is_dir("Modules/" . $package)) {
             echo "❌ Package already installed\n";
@@ -22,7 +21,6 @@ class InstallCommand
         }
         $folder = "Modules/" . $package;
         $client = new Client();
-
         // 🌐 Detect domain automatically
         $domain = gethostname();
 
