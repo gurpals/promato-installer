@@ -20,7 +20,7 @@ class InstallCommand
             echo "❌ Package already installed\n";
             exit(1);
         }
-
+        $folder = "Modules/" . $package;
         $client = new Client();
 
         // 🌐 Detect domain automatically
@@ -33,54 +33,121 @@ class InstallCommand
         // 🔐 Create signature (IMPORTANT)
         $signature = hash_hmac('sha256', json_encode($payload), $token);
         $clientIp = $this->getClientIp();
-        $res = $client->post($apiUrl, [
-            'json' => [
-                'token'     => $token,
-                'package'   => $package,
-                'domain'    => $domain,
-                'ip'        => $clientIp, // ✅ added
-                'payload'   => $payload,
-                'signature' => $signature,
-            ]
-        ]);
-
-        $data = json_decode($res->getBody(), true);
-
-        if (!$data['success']) {
-            echo "❌ " . ($data['message'] ?? 'Installation failed') . "\n";
+        try {
+            $res = $client->post($apiUrl, [
+                'json' => [
+                    'token'     => $token,
+                    'package'   => $package,
+                    'domain'    => $domain,
+                    'ip'        => $clientIp,
+                    'payload'   => $payload,
+                    'signature' => $signature,
+                ],
+                'stream'  => true,
+                'timeout' => 300
+            ]);
+        } catch (\Exception $e) {
+            echo "❌ Connection failed: " . $e->getMessage() . "\n";
             exit(1);
         }
 
-        $repo = $data['repo'];
-        
-        // $version = $data['version'];
-        $folder = "Modules/" . $package;
+        if ($res->getStatusCode() !== 200) {
+            echo "❌ Server error: " . $res->getStatusCode() . "\n";
+            exit(1);
+        }
+
+        $contentType = $res->getHeaderLine('Content-Type');
 
         echo "📦 Installing package...\n";
-        system("git clone --branch $package --single-branch $repo $folder");
-        // // 🚀 Clone
-        // system("git clone --depth=1 $repo $folder");
 
-        // // 🔄 Fetch tags
-        // system("cd $folder && git fetch --tags");
+        // ❌ JSON error
+        if (strpos($contentType, 'json') !== false) {
+            $data = json_decode($res->getBody(), true);
+            echo "❌ " . ($data['message'] ?? 'Error') . "\n";
+            exit(1);
+        }
 
-        // // 🎯 Checkout version
-        // system("cd $folder && git checkout $version");
+        // ✅ ZIP case
+        $zipFile = "package_" . uniqid() . ".zip";
 
-        // 📦 Install dependencies
-        system("cd $folder && composer install");
-         echo "✅ Package installed successfully\n";
-        // Register module
-        system("php artisan module:enable $package");
-         echo "✅ Package Registered successfully\n";
-       
-        // Refresh autoload
+        try {
+
+            echo "⬇️ Downloading package...\n";
+
+            $body = $res->getBody();
+            $fp = fopen($zipFile, 'w');
+
+            if (!$fp) {
+                throw new \Exception("Cannot write ZIP file");
+            }
+
+            while (!$body->eof()) {
+                fwrite($fp, $body->read(1024 * 8));
+            }
+
+            fclose($fp);
+
+            // Ensure Modules dir exists
+            if (!is_dir("Modules")) {
+                mkdir("Modules", 0755, true);
+            }
+
+            $zip = new \ZipArchive;
+
+            if ($zip->open($zipFile) !== TRUE) {
+                throw new \Exception("Invalid ZIP archive");
+            }
+
+            if ($zip->numFiles === 0) {
+                throw new \Exception("Empty package");
+            }
+
+            mkdir($folder, 0755, true);
+
+            if (!$zip->extractTo($folder)) {
+                throw new \Exception("Extraction failed");
+            }
+
+            $zip->close();
+
+            echo "✅ Package extracted\n";
+
+        } catch (\Exception $e) {
+
+            // 🧹 Cleanup partially created folder
+            if (is_dir($folder)) {
+                system("rm -rf " . escapeshellarg($folder));
+            }
+
+            echo "❌ " . $e->getMessage() . "\n";
+            exit(1);
+
+        } finally {
+
+            // 🔥 ALWAYS delete ZIP
+            if (file_exists($zipFile)) {
+                unlink($zipFile);
+            }
+        }
+
+        // ===============================
+        // ⚙️ POST-INSTALL
+        // ===============================
+
+        $folderSafe = escapeshellarg($folder);
+        $packageSafe = escapeshellarg($package);
+
+        system("cd $folderSafe && composer install");
+        echo "✅ Dependencies installed\n";
+
+        system("php artisan module:enable $packageSafe");
+        echo "✅ Module registered\n";
+
         system("composer dump-autoload");
 
         echo "⚙️ Running migrations...\n";
         system("php artisan migrate --path=$folder/Database/migrations --force");
 
-        // Run seeders if available
         $seederClass = "Modules\\$package\\Database\\Seeders\\DatabaseSeeder";
 
         if (file_exists("$folder/database/seeders/DatabaseSeeder.php")) {
@@ -89,6 +156,7 @@ class InstallCommand
         }
 
         echo "🎉 Setup completed successfully\n";
+
     }
     // 🔥 RAW fingerprint (NO HASH)
     private function generateFingerprint()
@@ -189,4 +257,5 @@ class InstallCommand
 
         return $_SERVER['REMOTE_ADDR'] ?? 'unknown';
     }
+ 
 }
