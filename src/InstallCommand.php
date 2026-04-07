@@ -44,8 +44,17 @@ class InstallCommand
                 'stream'  => true,
                 'timeout' => 300
             ]);
-        } catch (\Exception $e) {
-            echo "❌ Connection failed: " . $e->getMessage() . "\n";
+        } catch (\GuzzleHttp\Exception\ClientException $e) {
+            $response = $e->getResponse();
+
+            if ($response) {
+                $body = json_decode($response->getBody()->getContents(), true);
+
+                echo $body['message'] ?? 'Request failed';
+            } else {
+                echo 'Request failed';
+            }
+
             exit(1);
         }
 
