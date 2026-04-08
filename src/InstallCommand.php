@@ -7,8 +7,8 @@ class InstallCommand
 {
     public function handle($token, $package)
     {
-        // $apiUrl='https://oms.promato.co/api/package/info';
-        $apiUrl='http://192.168.1.47:8000/api/package/info';
+        $apiUrl='https://oms.promato.co/api/package/info';
+        // $apiUrl='http://192.168.1.47:8000/api/package/info';
         // ✅ Check git
         if (!shell_exec('git --version')) {
             echo "❌ Git not installed\n";
@@ -50,7 +50,7 @@ class InstallCommand
             if ($response) {
                 $body = json_decode($response->getBody()->getContents(), true);
 
-                echo $body['message'] ?? 'Request failed';
+                echo "❌ Request error: ".$body['message'] ?? 'Request failed';
             } else {
                 echo 'Request failed';
             }
