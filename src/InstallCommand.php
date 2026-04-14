@@ -8,7 +8,6 @@ class InstallCommand
     public function handle($token, $package)
     {
         $apiUrl='https://oms.promato.co/api/package/info';
-        // $apiUrl='http://192.168.1.47:8000/api/package/info';
         // ✅ Check git
         if (!shell_exec('git --version')) {
             echo "❌ Git not installed\n";
